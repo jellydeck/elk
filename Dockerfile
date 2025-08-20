@@ -1,63 +1,31 @@
-FROM docker.io/library/node:lts-alpine AS base
-
-# Prepare work directory
+FROM node:lts-alpine AS base
 WORKDIR /elk
 
 FROM base AS builder
-
-# Prepare pnpm https://pnpm.io/installation#using-corepack
-# workaround for npm registry key change
-# ref. `pnpm@10.1.0` / `pnpm@9.15.4` cannot be installed due to key id mismatch · Issue #612 · nodejs/corepack
-# - https://github.com/nodejs/corepack/issues/612#issuecomment-2629496091
+# Install Corepack, Git, etc.
 RUN npm i -g corepack@latest && corepack enable
+RUN apk update && apk add --no-cache git
 
-# Prepare deps
-RUN apk update
-RUN apk add git --no-cache
-
-# Prepare build deps ( ignore postinstall scripts for now )
-COPY package.json ./
-COPY .npmrc ./
-COPY pnpm-lock.yaml ./
-COPY patches ./patches
-RUN pnpm i --frozen-lockfile --ignore-scripts
-
-# Copy all source files
+# Bring in everything
 COPY . ./
 
-# Run full install with every postinstall script ( This needs project file )
-RUN pnpm i --frozen-lockfile
+# Install deps
+RUN pnpm install --frozen-lockfile
 
-# Update stale-dep markers and prepare Nuxt
-RUN pnpm dlx stale-dep -u
+# Generate translation status JSON
+RUN pnpm dlx nr prepare-translation-status
 
-# Build
+# Update stale-dep markers & run Nuxt prepare
+RUN pnpm dlx stale-dep -u && npx nuxi prepare
+
+# Now build
 RUN pnpm build
 
 FROM base AS runner
-
-ARG UID=911
-ARG GID=911
-
-# Create a dedicated user and group
-RUN set -eux; \
-    addgroup -g $GID elk; \
-    adduser -u $UID -D -G elk elk;
-
+ARG UID=911 GID=911
+RUN addgroup -g $GID elk && adduser -D -u $UID -G elk elk
 USER elk
-
-ENV NODE_ENV=production
-
+ENV NODE_ENV=production PORT=5314 NUXT_STORAGE_FS_BASE='/elk/data'
 COPY --from=builder /elk/.output ./.output
-
-EXPOSE 5314/tcp
-
-ENV PORT=5314
-
-# Specify container only environment variables ( can be overwritten by runtime env )
-ENV NUXT_STORAGE_FS_BASE='/elk/data'
-
-# Remove VOLUME keyword for Railway compatibility
-
-# Fix permissions on startup and start Elk
-ENTRYPOINT ["sh", "-c", "chown -R 911:911 /elk/data && exec node .output/server/index.mjs"]
+EXPOSE 5314
+ENTRYPOINT ["sh","-c","chown -R 911:911 /elk/data && exec node .output/server/index.mjs"]
