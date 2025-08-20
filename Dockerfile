@@ -15,11 +15,18 @@ RUN npm i -g corepack@latest && corepack enable
 RUN apk update
 RUN apk add git --no-cache
 
-# Copy all source files first (this is crucial for stale-dep to work properly)
+# Prepare build deps ( ignore postinstall scripts for now )
+COPY package.json ./
+COPY .npmrc ./
+COPY pnpm-lock.yaml ./
+COPY patches ./patches
+RUN pnpm i --frozen-lockfile --ignore-scripts
+
+# Copy all source files
 COPY . ./
 
-# Install dependencies with all postinstall scripts enabled
-RUN pnpm install --frozen-lockfile
+# Run full install with every postinstall script ( This needs project file )
+RUN pnpm i --frozen-lockfile
 
 # Build
 RUN pnpm build
@@ -47,5 +54,7 @@ ENV PORT=5314
 # Specify container only environment variables ( can be overwritten by runtime env )
 ENV NUXT_STORAGE_FS_BASE='/elk/data'
 
-# Fix permissions on startup and start Elk
-ENTRYPOINT ["sh", "-c", "chown -R 911:911 /elk/data && exec node .output/server/index.mjs"]
+# Persistent storage data
+VOLUME [ "/elk/data" ]
+
+CMD ["node", ".output/server/index.mjs"]
