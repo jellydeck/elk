@@ -28,6 +28,9 @@ COPY . ./
 # Run full install with every postinstall script ( This needs project file )
 RUN pnpm i --frozen-lockfile
 
+# Update stale-dep markers and prepare Nuxt
+RUN pnpm dlx stale-dep -u && npx nuxi prepare
+
 # Build
 RUN pnpm build
 
