@@ -29,7 +29,7 @@ COPY . ./
 RUN pnpm i --frozen-lockfile
 
 # Update stale-dep markers and prepare Nuxt
-RUN pnpm dlx stale-dep -u && npx nuxi prepare
+RUN pnpm dlx stale-dep -u
 
 # Build
 RUN pnpm build
