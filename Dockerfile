@@ -54,7 +54,7 @@ ENV PORT=5314
 # Specify container only environment variables ( can be overwritten by runtime env )
 ENV NUXT_STORAGE_FS_BASE='/elk/data'
 
-# Persistent storage data
-VOLUME [ "/elk/data" ]
+# Remove VOLUME keyword for Railway compatibility
 
-CMD ["node", ".output/server/index.mjs"]
+# Fix permissions on startup and start Elk
+ENTRYPOINT ["sh", "-c", "chown -R 911:911 /elk/data && exec node .output/server/index.mjs"]
